@@ -145,10 +145,10 @@ def pc_register(pclow, pchigh, bidi_corrected, spatial_hp=None, pre_smooth=None,
             smooth_img = smooth_img.astype(np.float32)
             if pre_smooth:
                  smooth_img = utils.spatial_smooth(smooth_img, int(pre_smooth))
-            smooth_img = utils.spatial_high_pass(smooth_img, int(spatial_hp))
+            smooth_img = utils.spatial_high_pass(smooth_img, int(spatial_hp))[np.newaxis, :]
 
         ymax, xmax, cmax = rigid.phasecorr(
-            data=rigid.apply_masks(data=smooth_img, maskMul=maskMul, maskOffset=maskOffset)[np.newaxis, :],
+            data=rigid.apply_masks(data=smooth_img, maskMul=maskMul, maskOffset=maskOffset),
             cfRefImg=cfRefImg.squeeze(),
             maxregshift=maxregshift,
             smooth_sigma_time=smooth_sigma_time,
@@ -162,7 +162,7 @@ def pc_register(pclow, pchigh, bidi_corrected, spatial_hp=None, pre_smooth=None,
                 smooth_img= gaussian_filter1d(smooth_img, sigma=smooth_sigma_time, axis=0)
 
             ymax1, xmax1, cmax1, = nonrigid.phasecorr(
-                data=smooth_img[np.newaxis, :],
+                data=smooth_img,
                 maskMul=maskMulNR.squeeze(),
                 maskOffset=maskOffsetNR.squeeze(),
                 cfRefImg=cfRefImgNR.squeeze(),
