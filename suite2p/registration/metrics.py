@@ -15,6 +15,7 @@ except ImportError:
 from . import rigid, nonrigid, utils
 from .. import io
 
+
 def pclowhigh(mov, nlowhigh, nPC, random_state):
     """ get mean of top and bottom PC weights for nPC's of mov
 
@@ -101,13 +102,14 @@ def pc_register(pclow, pchigh, bidi_corrected, spatial_hp=None, pre_smooth=None,
         refImg = pclow[i]
         Img = pchigh[i][np.newaxis, :, :]
 
+        # preprocess refImg for 1PReg
         if reg_1p:
-            data = refImg
-            data = data.astype(np.float32)
+            refImg = refImg.astype(np.float32)
             if pre_smooth:
-                data = utils.spatial_smooth(data, int(pre_smooth))
-            refImg = utils.spatial_high_pass(data, int(spatial_hp))
+                refImg = utils.spatial_smooth(refImg, int(pre_smooth))
+            refImg = utils.spatial_high_pass(refImg, int(spatial_hp))
 
+        # Prepares cfRefImgs and masks
         maskMul, maskOffset = rigid.compute_masks(
             refImg=refImg,
             maskSlope=spatial_taper if reg_1p else 3 * smooth_sigma
@@ -120,14 +122,6 @@ def pc_register(pclow, pchigh, bidi_corrected, spatial_hp=None, pre_smooth=None,
         cfRefImg = cfRefImg[np.newaxis, :, :]
         if is_nonrigid:
             maskSlope = spatial_taper if reg_1p else 3 * smooth_sigma  # slope of taper mask at the edges
-            # pre filtering for one-photon data
-            if reg_1p:
-                data = data.astype(np.float32)
-                if pre_smooth:
-                    data = utils.spatial_smooth(data, int(pre_smooth))
-                data = utils.spatial_high_pass(data, int(spatial_hp))
-                refImg = data
-
 
             maskMulNR, maskOffsetNR, cfRefImgNR = nonrigid.phasecorr_reference(
                 refImg0=refImg,
@@ -141,39 +135,34 @@ def pc_register(pclow, pchigh, bidi_corrected, spatial_hp=None, pre_smooth=None,
         if bidiphase and not bidi_corrected:
             bidiphase.shift(Img, bidiphase)
 
-        ###
-        dwrite = Img
-        if smooth_sigma_time > 0:
-            dwrite = gaussian_filter1d(dwrite, sigma=smooth_sigma_time, axis=0)
-            dwrite = dwrite.astype(np.float32)
-
-        # preprocessing for 1P recordings
-        if reg_1p:
-            Img = Img.astype(np.float32)
-
-            if pre_smooth:
-                dwrite = utils.spatial_smooth(dwrite, int(pre_smooth))
-            dwrite = utils.spatial_high_pass(dwrite, int(spatial_hp))
-
+        smooth_img = Img.copy()
         # rigid registration
+        if smooth_sigma_time > 0:
+            smooth_img = gaussian_filter1d(smooth_img, sigma=smooth_sigma_time, axis=0).astype(np.float32)
+
+        # preprocessing frame for 1P recording
+        if reg_1p:
+            smooth_img = smooth_img.astype(np.float32)
+            if pre_smooth:
+                 smooth_img = utils.spatial_smooth(smooth_img, int(pre_smooth))
+            smooth_img = utils.spatial_high_pass(smooth_img, int(spatial_hp))
+
         ymax, xmax, cmax = rigid.phasecorr(
-            data=rigid.apply_masks(data=dwrite, maskMul=maskMul, maskOffset=maskOffset),
+            data=rigid.apply_masks(data=smooth_img, maskMul=maskMul, maskOffset=maskOffset)[np.newaxis, :],
             cfRefImg=cfRefImg.squeeze(),
             maxregshift=maxregshift,
             smooth_sigma_time=smooth_sigma_time,
         )
         for frame, dy, dx in zip(Img, ymax.flatten(), xmax.flatten()):
             frame[:] = rigid.shift_frame(frame=frame, dy=dy, dx=dx)
-        ###
-
         # non-rigid registration
         if is_nonrigid:
-
+            smooth_img = Img.copy()
             if smooth_sigma_time > 0:
-                dwrite = gaussian_filter1d(dwrite, sigma=smooth_sigma_time, axis=0)
+                smooth_img= gaussian_filter1d(smooth_img, sigma=smooth_sigma_time, axis=0)
 
             ymax1, xmax1, cmax1, = nonrigid.phasecorr(
-                data=dwrite,
+                data=smooth_img[np.newaxis, :],
                 maskMul=maskMulNR.squeeze(),
                 maskOffset=maskOffsetNR.squeeze(),
                 cfRefImg=cfRefImgNR.squeeze(),
@@ -183,10 +172,11 @@ def pc_register(pclow, pchigh, bidi_corrected, spatial_hp=None, pre_smooth=None,
                 yblock=yblock,
                 maxregshiftNR=maxregshiftNR,
             )
-
+            # Populate Nonrigid offsets
             X[i,1] = np.mean((ymax1**2 + xmax1**2)**.5)
-            X[i,0] = np.mean((ymax[0]**2 + xmax[0]**2)**.5)
             X[i,2] = np.amax((ymax1**2 + xmax1**2)**.5)
+        # Populate Rigid offsets
+        X[i, 0] = np.mean((ymax[0] ** 2 + xmax[0] ** 2) ** .5)
     return X
 
 

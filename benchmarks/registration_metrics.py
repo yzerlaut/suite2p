@@ -2,7 +2,6 @@ import argparse
 import suite2p
 import numpy as np
 from typing import NamedTuple
-
 from suite2p.__main__ import add_args, parse_args
 
 
@@ -35,6 +34,7 @@ def registration_metrics(data_path, tiff_list, ops, nPC = 10):
 
 
 def main():
+
     default_parser = add_args(argparse.ArgumentParser(description='Suite2p parameters'))
     default_parser.add_argument('data_path', type=str, nargs=1, help='Path to directory with input files')
     default_parser.add_argument('--tiff_list', default=[], type=str, nargs='*', help='Input files selected')
