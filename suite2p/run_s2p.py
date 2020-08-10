@@ -139,7 +139,9 @@ def run_plane(ops, ops_path=None):
     ops = {**default_ops(), **ops}
 
     ops['date_proc'] = datetime.datetime.now()
-    
+
+    plane_time_dict = {}
+
     if ops_path is not None:
         ops['save_path'] = os.path.split(ops_path)[0]
         ops['ops_path'] = ops_path 
@@ -175,6 +177,7 @@ def run_plane(ops, ops_path=None):
         ops = registration.register_binary(ops) # register binary
         np.save(ops['ops_path'], ops)
         reg_time = time.time()-t11
+        plane_time_dict['reg_time'] = reg_time
         print('----------- Total %0.2f sec' % reg_time)
 
         if ops['two_step_registration'] and ops['keep_movie_raw']:
@@ -185,6 +188,7 @@ def run_plane(ops, ops_path=None):
             np.save(ops['ops_path'], ops)
             # TODO: Check if reg_time2 calculated right
             reg_time2 = time.time()-t11
+            plane_time_dict['reg_time2'] = reg_time2
             print('----------- Total %0.2f sec' % reg_time2)
 
         # compute metrics for registration
@@ -196,6 +200,7 @@ def run_plane(ops, ops_path=None):
             t0=time.time()
             ops = registration.get_pc_metrics(ops)
             reg_met_time = time.time()-t0
+            plane_time_dict['reg_met_time'] = reg_met_time
             print('Registration metrics, %0.2f sec.' % reg_met_time)
             np.save(os.path.join(ops['save_path'],'ops.npy'), ops)
 
@@ -251,6 +256,11 @@ def run_plane(ops, ops_path=None):
                 classification.Classifier(classfile=classfile, keys=['npix_norm', 'compact', 'skew']).run(stat),
             )
         class_time = time.time()-t11
+        plane_time_dict.update({
+            'det_time': det_time,
+            'ext_time': ext_time,
+            'class_time': class_time
+        })
         print('----------- Total %0.2f sec.' % class_time)
 
         ######### SPIKE DECONVOLUTION ###############
@@ -272,6 +282,7 @@ def run_plane(ops, ops_path=None):
             spks = extraction.oasis(F=dF, batch_size=ops['batch_size'], tau=ops['tau'], fs=ops['fs'])
             np.save(os.path.join(ops['save_path'],'spks.npy'), spks)
             deconv_time = time.time()-t11
+            plane_time_dict['deconv_time'] = deconv_time
             print('----------- Total %0.2f sec.' % deconv_time)
         else:
             print("WARNING: skipping spike detection (ops['spikedetect']=False)")
@@ -314,7 +325,10 @@ def run_plane(ops, ops_path=None):
             os.remove(ops['raw_file'])
             if ops['nchannels'] > 1:
                 os.remove(ops['raw_file_chan2'])
+    if ops.get('time_report'):
+        ops['plane_time_rep'] = plane_time_dict.copy()
     return ops
+
 
 def run_s2p(ops={}, db={}):
     """ run suite2p pipeline
@@ -412,7 +426,7 @@ def run_s2p(ops={}, db={}):
             op = run_plane(op, ops_path=ops_path)
             proc_time = time.time()-t1
             print('Plane %d processed in %0.2f sec (can open in GUI).' % (ipl, proc_time))
-            if op.get('time_report') and op.get('plane_time_rep'):
+            if op.get('time_report'):
                 op['plane_time_rep']['proc_time'] = proc_time
                 plane_reps.append(op['plane_time_rep'])
             ops1.append(op)
@@ -431,12 +445,14 @@ def run_s2p(ops={}, db={}):
             print('Saving in nwb format')
             io.save_nwb(save_folder)
 
-        total_time = time.time()-t0
-        print('TOTAL RUNTIME %0.2f sec' % total_time)
         if ops.get('time_report'):
             time_report = timing.TimeReport(
                 input_conv_time=input_conv_time,
                 plane_reps=plane_reps,
                 run_time=run_time
             )
+            time_report.save_report()
+
+        total_time = time.time()-t0
+        print('TOTAL RUNTIME %0.2f sec' % total_time)
         return ops1
