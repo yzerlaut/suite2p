@@ -446,12 +446,13 @@ def run_s2p(ops={}, db={}):
             io.save_nwb(save_folder)
 
         if ops.get('time_report'):
-            time_report = timing.TimeReport(
+            runtime_report = timing.RunTimeReport(
                 input_conv_time=input_conv_time,
                 plane_reps=plane_reps,
-                run_time=run_time
+                run_time=run_time,
+                save_path=ops['save_path0'],
             )
-            time_report.save_report()
+            runtime_report.save_report()
 
         total_time = time.time()-t0
         print('TOTAL RUNTIME %0.2f sec' % total_time)
