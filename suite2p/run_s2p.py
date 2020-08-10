@@ -6,7 +6,7 @@ from natsort import natsorted
 
 import numpy as np
 from scipy.io import savemat
-
+from benchmarks import timing
 from . import extraction, io, registration, detection, classification
 
 try:
@@ -362,6 +362,7 @@ def run_s2p(ops={}, db={}):
         files_found_flag = False
     if files_found_flag:
         print(f'FOUND BINARIES AND OPS IN {ops_paths}')
+        input_conv_time = None
     # if not set up files and copy tiffs/h5py to binary
     else:
         if not 'input_format' in ops.keys():
@@ -393,14 +394,13 @@ def run_s2p(ops={}, db={}):
             ))
         plane_folders = natsorted([ f.path for f in os.scandir(save_folder) if f.is_dir() and f.name[:5]=='plane'])
         ops_paths = [os.path.join(f, 'ops.npy') for f in plane_folders]
-    
-    ipl = 0
 
     if ops.get('multiplane_parallel', False):
         io.server.send_jobs(save_folder)
         return None
     else:
         ops1 = []
+        plane_reps = []
         for ipl, ops_path in enumerate(ops_paths):
             op = np.load(ops_path, allow_pickle=True).item()
             # make sure yrange and xrange are not overwritten
@@ -410,8 +410,11 @@ def run_s2p(ops={}, db={}):
             print('>>>>>>>>>>>>>>>>>>>>> PLANE %d <<<<<<<<<<<<<<<<<<<<<<'%ipl)
             t1 = time.time()
             op = run_plane(op, ops_path=ops_path)
-            plane_time = time.time()-t1
-            print('Plane %d processed in %0.2f sec (can open in GUI).' % (ipl, plane_time))
+            proc_time = time.time()-t1
+            print('Plane %d processed in %0.2f sec (can open in GUI).' % (ipl, proc_time))
+            if op.get('time_report') and op.get('plane_time_rep'):
+                op['plane_time_rep']['proc_time'] = proc_time
+                plane_reps.append(op['plane_time_rep'])
             ops1.append(op)
         run_time = time.time()-t0
         print('total = %0.2f sec.' % run_time)
@@ -430,4 +433,10 @@ def run_s2p(ops={}, db={}):
 
         total_time = time.time()-t0
         print('TOTAL RUNTIME %0.2f sec' % total_time)
+        if ops.get('time_report'):
+            time_report = timing.TimeReport(
+                input_conv_time=input_conv_time,
+                plane_reps=plane_reps,
+                run_time=run_time
+            )
         return ops1
