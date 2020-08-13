@@ -29,7 +29,6 @@ setuptools.setup(
     tests_require=[
       'pytest',
       'pynwb',
-      'pytest-qt',
     ],
     extras_require={
       "docs": [
