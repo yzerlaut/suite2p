@@ -57,7 +57,7 @@ def default_ops():
         'save_NWB': False,  # whether to save output as NWB file
         'combined': True,  # combine multiple planes into a single result /single canvas for GUI
         'aspect': 1.0,  # um/pixels in X / um/pixels in Y (for correct aspect ratio in GUI)
-        'time_report': True,
+        'report_time': True,
 
         # bidirectional phase offset
         'do_bidiphase': False,
@@ -313,7 +313,7 @@ def run_plane(ops, ops_path=None):
             os.remove(ops['raw_file'])
             if ops['nchannels'] > 1:
                 os.remove(ops['raw_file_chan2'])
-    if ops.get('time_report'):
+    if ops.get('report_time'):
         ops['timing'] = plane_time_dict.copy()
     return ops
 
@@ -405,7 +405,7 @@ def run_s2p(ops={}, db={}):
             op = run_plane(op, ops_path=ops_path)
             plane_time = time.time()-t1
             print('Plane %d processed in %0.2f sec (can open in GUI).' % (ipl, plane_time))
-            if ops.get('time_report'):
+            if ops.get('report_time'):
                 op['timing']['total_plane_time'] = plane_time
             ops1.append(op)
         run_time = time.time()-t0
