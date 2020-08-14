@@ -9,8 +9,13 @@ def test_do_registration_do_roi_detect_settings_check_timing(test_ops):
     test_ops.update({
         'tiff_list': ['input.tif'],
         'roidetect': False,
+        'do_registration': False,
         'spikedetect': False,
         'timing_report': True,
+    })
+    suite2p.run_s2p(ops=test_ops)  # conversion only
+    test_ops.update({
+        'do_registration': True
     })
     suite2p.run_s2p(ops=test_ops)  # registration only
     test_ops.update({
@@ -22,6 +27,3 @@ def test_do_registration_do_roi_detect_settings_check_timing(test_ops):
         'spikedetect': True
     })
     suite2p.run_s2p(ops=test_ops)  # detection & deconvolution
-    test_ops.update({
-        'spikedetect': True
-    })
