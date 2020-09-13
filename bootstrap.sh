@@ -19,6 +19,7 @@ cd /vagrant
 # Install suite2p dependencies
 conda env create -f environment.yml
 source activate suite2p
+echo "source activate suite2p" >> ~/.bashrc
 pip install .[data,nwb]
 dvc pull -r gdrive-travis
 pip install coveralls
