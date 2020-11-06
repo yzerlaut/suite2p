@@ -6,7 +6,7 @@ import warnings
 
 import numpy as np
 import pyqtgraph as pg
-from PyQt5 import QtGui, QtCore
+from PyQt5 import QtGui, QtCore, QtWidgets
 
 from . import menus, io, merge, views, buttons, classgui, traces, graphics, masks
 from .. import run_s2p, default_ops
@@ -17,7 +17,7 @@ class MainWindow(QtGui.QMainWindow):
         super(MainWindow, self).__init__()
         pg.setConfigOptions(imageAxisOrder="row-major")
 
-        self.setGeometry(50, 50, 1500, 800)
+        self.setGeometry(80, 80, 800, 600)
         self.setWindowTitle("suite2p (run pipeline or load stat.npy)")
         import suite2p
         s2p_dir = pathlib.Path(suite2p.__file__).parent
@@ -41,6 +41,7 @@ class MainWindow(QtGui.QMainWindow):
         self.styleInactive = ("QPushButton {Text-align: left; "
                               "background-color: rgb(50,50,50); "
                               "color:gray;}")
+        
         self.loaded = False
         self.ops_plot = []
         
@@ -112,9 +113,33 @@ class MainWindow(QtGui.QMainWindow):
             io.load_proc(self)
             #self.manual_label()
         self.setAcceptDrops(True)
+        
+        # adding a "quit" keyboard shortcut
+        self.quitSc = QtWidgets.QShortcut(QtGui.QKeySequence('Q'), self) # or 'Ctrl+Q'
+        self.quitSc.activated.connect(self.quit)
+        self.maxSc = QtWidgets.QShortcut(QtGui.QKeySequence('M'), self)
+        self.maxSc.activated.connect(self.showwindow)
+        self.minView = False
+        self.showwindow()
+        
         self.show()
         self.win.show()
 
+    def quit(self):
+        sys.exit()
+        
+    def showwindow(self):
+        if self.minView:
+            self.minView = self.maxview()
+        else:
+            self.minView = self.minview()
+    def maxview(self):
+        self.showFullScreen()
+        return False
+    def minview(self):
+        self.showNormal()
+        return True
+        
     def dragEnterEvent(self, event):
         if event.mimeData().hasUrls():
             event.accept()
