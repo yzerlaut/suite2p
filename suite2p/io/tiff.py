@@ -399,7 +399,7 @@ def ome_to_binary(ops):
         ix = ik % nplanes
         ops1[ix]['nframes'] += 1
         ops1[ix]['frames_per_folder'][0] += 1
-        ops1[ix]['meanImg'] += im
+        ops1[ix]['meanImg'] += im.astype('uint16')
         reg_file[ix].write(bytearray(im))
         gc.collect()
 
