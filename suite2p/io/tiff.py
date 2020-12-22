@@ -171,9 +171,9 @@ def tiff_to_binary(ops):
         ops['Ly'],ops['Lx'] = ops['meanImg'].shape
         ops['yrange'] = np.array([0,ops['Ly']])
         ops['xrange'] = np.array([0,ops['Lx']])
-        ops['meanImg'] /= ops['nframes']
+        ops['meanImg'] = ops['meanImg']/ops['nframes']
         if nchannels>1:
-            ops['meanImg_chan2'] /= ops['nframes']
+            ops['meanImg_chan2'] = ops['meanImg_chan2']/ops['nframes']
         np.save(ops['ops_path'], ops)
     # close all binary files and write ops files
     for j in range(0,nplanes):
@@ -323,9 +323,9 @@ def mesoscan_to_binary(ops):
         if not do_registration:
             ops['yrange'] = np.array([0,ops['Ly']])
             ops['xrange'] = np.array([0,ops['Lx']])
-        ops['meanImg'] /= ops['nframes']
+        ops['meanImg'] = ops['meanImg']/ops['nframes']
         if nchannels>1:
-            ops['meanImg_chan2'] /= ops['nframes']
+            ops['meanImg_chan2'] = ops['meanImg_chan2']/ops['nframes']
         np.save(ops['ops_path'], ops)
     # close all binary files and write ops files
     for j in range(0,ops['nplanes']):
@@ -429,9 +429,9 @@ def ome_to_binary(ops):
         if not do_registration:
             ops['yrange'] = np.array([0,ops['Ly']])
             ops['xrange'] = np.array([0,ops['Lx']])
-        ops['meanImg'] /= ops['nframes']
+        ops['meanImg'] = ops['meanImg']/ops['nframes']
         if nchannels>1:
-            ops['meanImg_chan2'] /= ops['nframes']
+            ops['meanImg_chan2'] = ops['meanImg_chan2']/ops['nframes']
         np.save(ops['ops_path'], ops)
     # close all binary files and write ops files
     for j in range(0,nplanes):
