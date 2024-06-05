@@ -8,7 +8,7 @@ import math
 import numpy as np
 import pyqtgraph as pg
 from qtpy import QtGui, QtCore
-from qtpy.QtWidgets import QPushButton, QLabel, QLineEdit, QMainWindow, QGridLayout, QButtonGroup, QMessageBox, QWidget
+from qtpy.QtWidgets import QPushButton, QLabel, QLineEdit, QMainWindow, QGridLayout, QButtonGroup, QMessageBox, QWidget, QComboBox
 from matplotlib.colors import hsv_to_rgb
 from scipy import stats
 from scipy.ndimage import rotate
@@ -159,30 +159,35 @@ class ROIDraw(QMainWindow):
         self.instructions.setStyleSheet("color: white;")
         self.l0.addWidget(self.instructions, 1, 0, 1, 4)
 
+        self.typeROI = QComboBox()
+        self.typeROI.addItems(["Ellipse", "Rectangle"])
+        self.typeROI.setFont(QtGui.QFont("Arial", 8, QtGui.QFont.Bold))
+        self.typeROI.setFixedWidth(100)
+        self.l0.addWidget(self.typeROI, 2, 0, 1, 1)
         self.addROI = QPushButton("add ROI")
         self.addROI.setFont(QtGui.QFont("Arial", 8, QtGui.QFont.Bold))
         self.addROI.clicked.connect(lambda: self.add_ROI(pos=None))
         self.addROI.setEnabled(True)
         self.addROI.setFixedWidth(60)
-        self.addROI.setStyleSheet(self.styleUnpressed)
-        self.l0.addWidget(self.addROI, 2, 0, 1, 1)
-        lbl = QLabel("diameter:")
+        # self.addROI.setStyleSheet(self.styleUnpressed)
+        self.l0.addWidget(self.addROI, 2, 1, 1, 1)
+        lbl = QLabel("size:")
         lbl.setFont(QtGui.QFont("Arial", 8, QtGui.QFont.Bold))
         lbl.setStyleSheet("color: white;")
         lbl.setFixedWidth(60)
-        self.l0.addWidget(lbl, 2, 1, 1, 1)
+        self.l0.addWidget(lbl, 2, 2, 1, 1)
         self.diam = QLineEdit(self)
         self.diam.setValidator(QtGui.QIntValidator(0, 10000))
         self.diam.setText("12")
         self.diam.setFixedWidth(35)
         self.diam.setAlignment(QtCore.Qt.AlignRight)
-        self.l0.addWidget(self.diam, 2, 2, 1, 1)
+        self.l0.addWidget(self.diam, 2, 3, 1, 1)
         self.ROIs = []
         self.cell_pos = []
         self.extracted = False
         self.procROI = QPushButton("extract ROIs")
         self.procROI.setFont(QtGui.QFont("Arial", 8, QtGui.QFont.Bold))
-        self.procROI.setStyleSheet(self.styleUnpressed)
+        # self.procROI.setStyleSheet(self.styleUnpressed)
         self.procROI.setCheckable(False)
         self.procROI.clicked.connect(self.proc_ROI)
         self.l0.addWidget(self.procROI, 3, 0, 1, 3)
@@ -420,13 +425,13 @@ class ROIDraw(QMainWindow):
         self.scatter = []
         self.tlabel = []
         for n in range(self.nROIs):
-            ellipse = self.ROIs[n].ellipse
+            roiPixels = self.ROIs[n].roiPixels
             yrange = self.ROIs[n].yrange
             xrange = self.ROIs[n].xrange
             med = self.ROIs[n].med
             x, y = np.meshgrid(xrange, yrange)
-            ypix = y[ellipse].flatten()
-            xpix = x[ellipse].flatten()
+            ypix = y[roiPixels].flatten()
+            xpix = x[roiPixels].flatten()
             lam = np.ones(ypix.shape)
             stat0.append({
                 "ypix": ypix,
@@ -530,8 +535,14 @@ class sROI():
 
     def draw(self, parent, imy, imx, dy, dx):
         roipen = pg.mkPen(self.color, width=3, style=QtCore.Qt.SolidLine)
-        self.ROI = pg.EllipseROI([imx, imy], [dx, dy], pen=roipen, removable=True)
-        # self.ROI = pg.RectROI([imx, imy], [dx, dy], pen=roipen, removable=True)
+        if parent.typeROI.currentText()=='Ellipse':
+            self.typeROI = 'Ellipse'
+            self.ROI = pg.EllipseROI([imx, imy], [dx, dy], pen=roipen, removable=True)
+        elif parent.typeROI.currentText()=='Rectangle':
+            self.typeROI = 'Rectangle'
+            self.ROI = pg.RectROI([imx, imy], [dx, dy], pen=roipen, removable=True)
+        else:
+            print('ROI type not recognized')
         self.ROI.handleSize = 8
         self.ROI.handlePen = roipen
         self.ROI.addScaleHandle([1, 0.5], [0., 0.5])
@@ -551,15 +562,6 @@ class sROI():
         parent.nROIs -= 1
         parent.win.show()
         parent.show()
-
-    def rotate_ROI(self, parent, ellipse, xrange, yrange, posx, posy):
-        #Rotates ROI depending on Rotatehandle degree
-        ellipse = rotate(ellipse, angle=math.floor(self.ROI.angle()), order=0)
-        ellipse = np.flip(ellipse, axis=0)
-        xrange = (np.arange(-1 * int(ellipse.shape[1] - 1), 1) + int(posx)).astype(np.int32)
-        yrange = (np.arange(-1 * int(ellipse.shape[0] - 1), 1) + int(posy)).astype(np.int32)
-        yrange += int(np.floor(ellipse.shape[0] / 2)) + 1
-        return ellipse, xrange, yrange
 
     def position(self, parent):
         """
@@ -596,16 +598,21 @@ class sROI():
         X, Y = (X-cX)*np.cos(angle) + (cY-Y)*np.sin(angle),\
                     -(X-cX)*np.sin(angle) + (cY-Y)*np.cos(angle)
 
-        # ellipse equation 
-        ellipse = ( X**2/(s1/2)**2 + Y**2/(s2/2)**2 ) <= 1
+        if self.typeROI=='Ellipse':
+            # ellipse equation 
+            roiPixels = ( X**2/(s1/2.)**2 + Y**2/(s2/2.)**2 ) <= 1
+        elif self.typeROI=='Rectangle':
+            # rectangle equation 
+            roiPixels = (X>=(-s1/2.)) & (X<=(+s1/2.)) &\
+                (Y>=(-s2/2.)) & (Y<=(+s2/2.))
 
         #ensures that ROI is not placed outside of movie coordinates
-        ellipse = ellipse[:, np.logical_and(xrange >= 0, xrange < parent.Lx)]
+        roiPixels = roiPixels[:, np.logical_and(xrange >= 0, xrange < parent.Lx)]
         xrange = xrange[np.logical_and(xrange >= 0, xrange < parent.Lx)]
-        ellipse = ellipse[np.logical_and(yrange >= 0, yrange < parent.Ly), :]
+        roiPixels = roiPixels[np.logical_and(yrange >= 0, yrange < parent.Ly), :]
         yrange = yrange[np.logical_and(yrange >= 0, yrange < parent.Ly)]
 
         # store results as ROI attributes
-        self.ellipse = ellipse
+        self.roiPixels = roiPixels
         self.xrange = xrange
         self.yrange = yrange
