@@ -530,8 +530,8 @@ class sROI():
 
     def draw(self, parent, imy, imx, dy, dx):
         roipen = pg.mkPen(self.color, width=3, style=QtCore.Qt.SolidLine)
-        # self.ROI = pg.EllipseROI([imx, imy], [dx, dy], pen=roipen, removable=True)
-        self.ROI = pg.RectROI([imx, imy], [dx, dy], pen=roipen, removable=True)
+        self.ROI = pg.EllipseROI([imx, imy], [dx, dy], pen=roipen, removable=True)
+        # self.ROI = pg.RectROI([imx, imy], [dx, dy], pen=roipen, removable=True)
         self.ROI.handleSize = 8
         self.ROI.handlePen = roipen
         self.ROI.addScaleHandle([1, 0.5], [0., 0.5])
@@ -586,50 +586,18 @@ class sROI():
         # ROI center coordinates
         cX = c1+np.cos(angle)*s1/2.+np.sin(angle)*s2/2.
         cY = c2-np.sin(angle)*s1/2.+np.cos(angle)*s2/2.
-        # ROI extent in x,y coordinates
-        sX = np.abs(np.cos(angle)*s1+np.sin(angle)*s2)
-        sY = np.abs(-np.sin(angle)*s1+np.cos(angle)*s2)
 
-        print('x, y :', cX, cY, sX, sY, 180.*angle/np.pi)
-        #
-
-        xrange = (np.arange(int(sX)) + int(c1)).astype(np.int32)
-        yrange = (np.arange(int(sY)) + int(c2)).astype(np.int32)
+        # to build the xrange, yrange: +/- (s1+s2)/2. for security
+        xrange = (np.arange(-int((s1+s2)/2.), int((s1+s2)/2.)+1) + int(cX)).astype(np.int32)
+        yrange = (np.arange(-int((s1+s2)/2.), int((s1+s2)/2.)+1) + int(cY)).astype(np.int32)
 
         X, Y = np.meshgrid(xrange, yrange)
-        if True:
-            ellipse = ( ( (X-cX)*np.cos(angle)+(Y-cY)*np.sin(angle) )**2/s1**2 +\
-                        ( (X-cX)*np.sin(angle)-(Y-cY)*np.cos(angle) )**2/s2**2 ) < 1
-        else:
-            ellipse = np.ones(X.shape, dtype=bool) # True in the whole Rect
+        # perform coordinate translation and rotation (with y-reversed)
+        X, Y = (X-cX)*np.cos(angle) + (cY-Y)*np.sin(angle),\
+                    -(X-cX)*np.sin(angle) + (cY-Y)*np.cos(angle)
 
-        # pos0 = self.ROI.getSceneHandlePositions()
-        # sizex, sizey = self.ROI.size()
-        # pos = parent.p0.mapSceneToView(pos0[0][1])
-        # br = self.ROI.boundingRect()
-        # posy = pos.y()
-        # posx = pos.x()
-        # print(posx, posy)
-
-        # iSX = int(sX)
-        # xrange = (np.arange(-1 * int(sizex), 1) + int(posx)).astype(np.int32)
-        # yrange = (np.arange(-1 * int(sizey), 1) + int(posy)).astype(np.int32)
-
-        # xrange = (np.arange(-1 * int(sizex), 1) + int(posx)).astype(np.int32)
-        # yrange = (np.arange(-1 * int(sizey), 1) + int(posy)).astype(np.int32)
-        # yrange += int(np.floor(sizey / 2)) + 1
-        # what is ellipse circling?
-        # br = self.ROI.boundingRect()
-        # ellipse = np.zeros((yrange.size, xrange.size), "bool")
-
-
-        # ellipse = np.zeros((yrange.size, xrange.size), dtype=bool)
-        # x, y = np.meshgrid(np.arange(0, xrange.size, 1), np.arange(0, yrange.size, 1))
-        # ellipse = ((y - br.center().y())**2 / (br.height() / 2)**2 +
-                   # (x - br.center().x())**2 / (br.width() / 2)**2) <= 1
-        # if self.ROI.angle() not in (0, 180, -180):
-            # ellipse, xrange, yrange = self.rotate_ROI(parent, ellipse, xrange, yrange, posx, posy)
-
+        # ellipse equation 
+        ellipse = ( X**2/(s1/2)**2 + Y**2/(s2/2)**2 ) <= 1
 
         #ensures that ROI is not placed outside of movie coordinates
         ellipse = ellipse[:, np.logical_and(xrange >= 0, xrange < parent.Lx)]
@@ -637,6 +605,7 @@ class sROI():
         ellipse = ellipse[np.logical_and(yrange >= 0, yrange < parent.Ly), :]
         yrange = yrange[np.logical_and(yrange >= 0, yrange < parent.Ly)]
 
+        # store results as ROI attributes
         self.ellipse = ellipse
         self.xrange = xrange
         self.yrange = yrange
