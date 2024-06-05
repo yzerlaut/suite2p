@@ -531,6 +531,7 @@ class sROI():
     def draw(self, parent, imy, imx, dy, dx):
         roipen = pg.mkPen(self.color, width=3, style=QtCore.Qt.SolidLine)
         self.ROI = pg.EllipseROI([imx, imy], [dx, dy], pen=roipen, removable=True)
+        # self.ROI = pg.RectROI([imx, imy], [dx, dy], pen=roipen, removable=True)
         self.ROI.handleSize = 8
         self.ROI.handlePen = roipen
         self.ROI.addScaleHandle([1, 0.5], [0., 0.5])
@@ -561,31 +562,50 @@ class sROI():
         return ellipse, xrange, yrange
 
     def position(self, parent):
-        parent.iROI = self.iROI
-        pos0 = self.ROI.getSceneHandlePositions()
-        sizex, sizey = self.ROI.size()
-        pos = parent.p0.mapSceneToView(pos0[0][1])
-        br = self.ROI.boundingRect()
-        posy = pos.y()
-        posx = pos.x()
+        """
+        coordinate system of this pyqtgraph display (reversed y)
+        0---->(x)
+        | \     )
+        |  \   )     so angle counter-clockwise 
+        |   \ )
+        v    \
+        (y)
 
-        xrange = (np.arange(-1 * int(sizex), 1) + int(posx)).astype(np.int32)
-        yrange = (np.arange(-1 * int(sizey), 1) + int(posy)).astype(np.int32)
-        yrange += int(np.floor(sizey / 2)) + 1
-        # what is ellipse circling?
-        br = self.ROI.boundingRect()
-        ellipse = np.zeros((yrange.size, xrange.size), "bool")
-        x, y = np.meshgrid(np.arange(0, xrange.size, 1), np.arange(0, yrange.size, 1))
-        ellipse = ((y - br.center().y())**2 / (br.height() / 2)**2 +
-                   (x - br.center().x())**2 / (br.width() / 2)**2) <= 1
-        if self.ROI.angle() not in (0, 180, -180):
-            ellipse, xrange, yrange = self.rotate_ROI(parent, ellipse, xrange, yrange, posx, posy)
+        ROI.pos() corresponds to the top-left of the ROI
+        s1, s2 = ROI.size()
+        where s1 is the size along the direction angle=0
+        and s2 is the direction perpendicular to it
+        """
+
+        parent.iROI = self.iROI
+
+        # extract props from ROI
+        c1, c2 = self.ROI.pos() # ROI-edge coordinates
+        s1, s2 = self.ROI.size() # ROI extent in the two axis
+        angle = -self.ROI.angle()*np.pi/180. # ROI orientation in *Radians*
+        # ROI center coordinates
+        cX = c1+np.cos(angle)*s1/2.+np.sin(angle)*s2/2.
+        cY = c2-np.sin(angle)*s1/2.+np.cos(angle)*s2/2.
+
+        # to build the xrange, yrange: +/- (s1+s2)/2. for security
+        xrange = (np.arange(-int((s1+s2)/2.), int((s1+s2)/2.)+1) + int(cX)).astype(np.int32)
+        yrange = (np.arange(-int((s1+s2)/2.), int((s1+s2)/2.)+1) + int(cY)).astype(np.int32)
+
+        X, Y = np.meshgrid(xrange, yrange)
+        # perform coordinate translation and rotation (with y-reversed)
+        X, Y = (X-cX)*np.cos(angle) + (cY-Y)*np.sin(angle),\
+                    -(X-cX)*np.sin(angle) + (cY-Y)*np.cos(angle)
+
+        # ellipse equation 
+        ellipse = ( X**2/(s1/2)**2 + Y**2/(s2/2)**2 ) <= 1
+
         #ensures that ROI is not placed outside of movie coordinates
         ellipse = ellipse[:, np.logical_and(xrange >= 0, xrange < parent.Lx)]
         xrange = xrange[np.logical_and(xrange >= 0, xrange < parent.Lx)]
         ellipse = ellipse[np.logical_and(yrange >= 0, yrange < parent.Ly), :]
         yrange = yrange[np.logical_and(yrange >= 0, yrange < parent.Ly)]
 
+        # store results as ROI attributes
         self.ellipse = ellipse
         self.xrange = xrange
         self.yrange = yrange
