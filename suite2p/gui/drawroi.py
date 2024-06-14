@@ -81,11 +81,14 @@ def masks_and_traces(ops, stat_manual, stat_orig):
             np.mean(manual_roi_stats[n]["xpix"])
         ]
 
-    dF = preprocess(F=dF, baseline=ops["baseline"], win_baseline=ops["win_baseline"],
-                    sig_baseline=ops["sig_baseline"], fs=ops["fs"],
-                    prctile_baseline=ops["prctile_baseline"])
-    spks = oasis(F=dF, batch_size=ops["batch_size"], tau=ops["tau"], fs=ops["fs"])
-
+    if ops.get("spikedetect", True):
+        dF = preprocess(F=dF, baseline=ops["baseline"], win_baseline=ops["win_baseline"],
+                        sig_baseline=ops["sig_baseline"], fs=ops["fs"],
+                        prctile_baseline=ops["prctile_baseline"])
+        spks = oasis(F=dF, batch_size=ops["batch_size"], tau=ops["tau"], fs=ops["fs"])
+    else:
+        print("WARNING: skipping spike detection (ops['spikedetect']=False)")
+        spks = np.zeros_like(F)
     return F, Fneu, F_chan2, Fneu_chan2, spks, ops, manual_roi_stats
 
 
